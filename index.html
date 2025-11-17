@@ -1,0 +1,2315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DATA-HUB Providencia</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          crossorigin=""/>
+    
+    <script src="https://unpkg.com/@turf/turf@latest/turf.min.js"></script>
+    
+    <script src="https://unpkg.com/chart.js@3.7.0/dist/chart.min.js"></script>
+    <script src="https://unpkg.com/chartjs-plugin-datalabels@2.0.0/dist/chartjs-plugin-datalabels.min.js"></script>
+    
+    <style>
+        /* Estilos personalizados para complementar Tailwind */
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; 
+        }
+        #app-container {
+            height: 100vh;
+        }
+        .sidebar {
+            transition: transform 0.3s ease-in-out;
+        }
+        .sidebar-hidden {
+            transform: translateX(-100%);
+        }
+        /* Definición para el contenedor del mapa real */
+        #map {
+            width: 100%;
+            height: 100%; 
+            min-height: 400px;
+            z-index: 1; 
+            background-color: #f0f9ff;
+        }
+        /* Estilos para el informe modal */
+        #reportModal, #analysisModal {
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            transition: transform 0.3s ease;
+        }
+        /* Scrollbar personalizado */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Estilos para el popup de Leaflet */
+        .leaflet-popup-content-wrapper {
+            border-radius: 8px;
+        }
+        .leaflet-popup-content {
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 14px;
+            font-size: 13px;
+        }
+        .leaflet-popup-content b {
+            color: #333;
+        }
+        /* Estilo para los mapas del croquis */
+        #report-map-sketch, #report-map-sketch-comercial, #competitor-map-sketch {
+             /* Asegura que el mapa de Leaflet se renderice correctamente */
+             z-index: 50; 
+        }
+
+        /* --- INICIO DE CÓDIGO DE IMPRESIÓN --- */
+        /* Estilos para controlar la impresión */
+        @media print {
+            /* Ocultar todo el cuerpo por defecto */
+            body > * {
+                display: none;
+            }
+            
+            /* Mostrar solo el modal que está activo y su contenido */
+            .is-printing {
+                display: block !important;
+                position: static !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: none !important;
+                box-shadow: none !important;
+                transform: none !important;
+                background-color: white !important;
+                opacity: 1 !important;
+                overflow: visible !important;
+                background: none !important;
+                padding: 0;
+            }
+            .is-printing .modal-content {
+                display: block !important;
+                position: static !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                max-height: none !important;
+                box-shadow: none !important;
+                transform: none !important;
+                background-color: white !important;
+                opacity: 1 !important;
+                overflow: visible !important;
+            }
+
+            /* Mostrar los mapas en la impresión */
+            #report-map-sketch, #report-map-sketch-comercial, #competitor-map-sketch {
+                display: block !important;
+                width: 100%;
+                height: 200px; /* Darle una altura fija para la impresión */
+                overflow: hidden;
+                border: 1px solid #ccc; /* Añadir un borde simple */
+                page-break-inside: avoid; /* Intentar evitar que se corte el mapa */
+            }
+            /* Forzar a los tiles de Leaflet a ser visibles */
+            .leaflet-tile-container,
+            .leaflet-pane,
+            .leaflet-layer {
+                display: block !important;
+                visibility: visible !important;
+            }
+            
+            /* Evitar cortes de página en tablas */
+            .printable-table, .printable-section {
+                page-break-inside: avoid;
+            }
+            
+            /* Ocultar botones de acción en la impresión */
+            .modal-print-hide {
+                display: none !important;
+            }
+        }
+        /* --- FIN DE CÓDIGO DE IMPRESIÓN --- */
+    </style>
+</head>
+<body class="bg-white">
+
+    <div id="landing-page" class="flex flex-col h-screen">
+        <header class="bg-gray-800 text-white shadow-md">
+            <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                        <svg class="h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                        </svg>
+                        <span class="text-xl font-bold">DATA-HUB</span>
+                </div>
+                <nav class="hidden md:flex items-center space-x-6 text-sm">
+                    <a href="#" class="text-gray-300 hover:text-white border-b-2 border-transparent hover:border-white transition">INICIO</a>
+                    <a href="#" class="text-gray-300 hover:text-white border-b-2 border-transparent hover:border-white transition">TUTORIALES</a>
+                    <a href="#" class="text-gray-300 hover:text-white border-b-2 border-transparent hover:border-white transition">CONTACTO</a>
+                    <a href="#" class="text-gray-300 hover:text-white border-b-2 border-transparent hover:border-white transition">MAPA</a>
+                </nav>
+            </div>
+        </header>
+
+        <main class="flex-grow container mx-auto px-6 flex items-center">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div class="text-center lg:text-left">
+                    <h1 class="text-4xl md:text-5xl font-bold text-gray-800 leading-tight">
+                        ¡Bienvenidos a DATA-HUB Providencia!
+                    </h1>
+                    <p class="mt-4 text-gray-600 text-lg">
+                        Consulta información del Plan Regulador, Catastro Comercial, Flujos de personas y mucho más. Todo en un solo lugar.
+                    </p>
+                    <button id="go-to-map-btn" class="mt-8 bg-orange-500 text-white font-bold py-3 px-8 rounded-full hover:bg-orange-600 transition-transform transform hover:scale-105 shadow-lg">
+                        Ir al mapa
+                    </button>
+                </div>
+                <div class="p-4">
+                    <svg viewBox="0 0 500 400" xmlns="http://www.w3.org/2000/svg">
+                        <g transform="translate(20, 20)">
+                            <rect width="460" height="360" rx="20" fill="#f0f9ff"/>
+                            <path d="M 0 150 H 460 M 180 0 V 360 M 350 0 V 360" stroke="#dbeafe" stroke-width="15"/>
+                            
+                            <rect x="50" y="180" width="100" height="150" fill="#94a3b8" rx="5"/>
+                            <rect x="60" y="200" width="25" height="25" fill="#e0f2fe"/>
+                            <rect x="105" y="200" width="25" height="25" fill="#e0f2fe"/>
+                            <rect x="60" y="250" width="25" height="25" fill="#e0f2fe"/>
+                            <rect x="105" y="250" width="25" height="25" fill="#e0f2fe"/>
+
+                            <rect x="210" y="50" width="120" height="280" fill="#64748b" rx="5"/>
+                            <rect x="220" y="70" width="40" height="40" fill="#e0f2fe" rx="2"/>
+                            <rect x="280" y="70" width="40" height="40" fill="#e0f2fe" rx="2"/>
+                            <rect x="220" y="130" width="40" height="40" fill="#e0f2fe" rx="2"/>
+                            <rect x="280" y="130" width="40" height="40" fill="#e0f2fe" rx="2"/>
+                            <rect x="220" y="190" width="40" height="40" fill="#e0f2fe" rx="2"/>
+                            <rect x="280" y="190" width="40" height="40" fill="#e0f2fe" rx="2"/>
+                            
+                            <rect x="40" y="40" width="120" height="90" fill="#fbbf24" opacity="0.4" rx="10"/>
+                            <path d="M100 20 C 80 20, 80 50, 100 50 C 120 50, 120 20, 100 20 Z M 100 50 L 100 80" fill="#ef4444" stroke="#ffffff" stroke-width="2"/>
+                            <circle cx="100" cy="38" r="8" fill="#ffffff"/>
+
+                            <circle cx="390" cy="190" r="15" fill="#22c55e"/>
+                            <rect x="385" y="200" width="10" height="20" fill="#a3a3a8"/>
+                             <circle cx="410" cy="230" r="25" fill="#16a34a"/>
+                            <rect x="405" y="250" width="10" height="30" fill="#a3a3a8"/>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+        </main>
+    </div>
+
+
+    <div id="app-container" class="hidden">
+        <div class="flex h-screen w-screen text-gray-800">
+            <aside id="sidebar" class="sidebar absolute lg:relative z-30 w-96 h-full bg-white shadow-lg flex flex-col transition-transform duration-300 ease-in-out">
+                <div class="flex items-center justify-between p-4 border-b">
+                    <div class="flex items-center space-x-3">
+                        <svg class="h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                        </svg>
+                        <h1 class="text-xl font-bold text-gray-700">DATA-HUB</h1>
+                    </div>
+                    <button id="closeSidebarBtn" class="lg:hidden p-1 rounded-full hover:bg-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="border-b">
+                    <nav class="flex -mb-px">
+                        <button data-tab="search" class="tab-btn flex-1 py-3 px-1 text-center border-b-2 border-blue-500 text-blue-600 font-semibold">
+                            <span class="inline-block md:hidden">🔍</span>
+                            <span class="hidden md:inline-block">Análisis de constructibilidad</span>
+                        </button>
+                        <button data-tab="analysis" class="tab-btn flex-1 py-3 px-1 text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-semibold">
+                            <span class="inline-block md:hidden">📊</span>
+                            <span class="hidden md:inline-block">Análisis comercial</span>
+                        </button>
+                    </nav>
+                </div>
+
+                <div class="flex-grow overflow-y-auto p-4 space-y-6">
+                    <div id="search-tab-content" class="tab-content space-y-6">
+                        <div>
+                            <label for="address-search" class="text-sm font-medium text-gray-600">Buscar por Dirección </label>
+                            <div class="mt-1 flex rounded-md shadow-sm">
+                                <input type="text" id="address-search" class="flex-1 block w-full rounded-none rounded-l-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="Ej: Av. Providencia 123">
+                                <button id="search-button" class="inline-flex items-center rounded-r-md border border-l-0 border-gray-300 bg-blue-500 px-3 text-sm text-white hover:bg-blue-600">
+                                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="search-results" class="mt-2 space-y-1 bg-white border border-gray-200 rounded-md max-h-40 overflow-y-auto hidden">
+                                </div>
+                        </div>
+
+                        <div id="property-info" class="space-y-4 pt-4 border-t border-dashed">
+                            <h3 class="font-bold text-lg text-gray-700">Ficha del Predio / Punto</h3>
+                            <p id="no-property-selected" class="text-sm text-gray-500 italic">Seleccione un predio o haga clic en el mapa para ubicar un punto.</p>
+
+                            <div id="pin-details" class="space-y-2 text-sm bg-indigo-50 p-3 rounded-lg border border-indigo-200 hidden">
+                                <h4 class="font-semibold text-indigo-800">Ubicación Seleccionada (Pin)</h4>
+                                <div>
+                                    <span class="font-semibold text-gray-600">Dirección:</span>
+                                    <span id="pin-address" class="break-words">--</span>
+                                </div>
+                                <div>
+                                    <span class="font-semibold text-gray-600">Latitud:</span>
+                                    <span id="pin-lat">--</span>
+                                </div>
+                                <div>
+                                    <span class="font-semibold text-gray-600">Longitud:</span>
+                                    <span id="pin-lng">--</span>
+                                </div>
+                            </div>
+                            
+                            <div id="feature-details" class="hidden space-y-2 text-sm bg-blue-50 p-3 rounded-lg border border-blue-200">
+                                <h4 id="feature-title" class="font-semibold text-blue-800">Detalles de la Selección</h4>
+                                <div id="feature-content" class="space-y-1 max-h-64 overflow-y-auto">
+                                    </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="analysis-tab-content" class="tab-content hidden space-y-6">
+                        <div>
+                            <label for="address-search-analysis" class="text-sm font-medium text-gray-600">Buscar por Dirección </label>
+                            <div class="mt-1 flex rounded-md shadow-sm">
+                                <input type="text" id="address-search-analysis" class="flex-1 block w-full rounded-none rounded-l-md border-gray-300 focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="Ej: Av. Providencia 123">
+                                <button id="search-button-analysis" class="inline-flex items-center rounded-r-md border border-l-0 border-gray-300 bg-blue-500 px-3 text-sm text-white hover:bg-blue-600">
+                                    <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div id="search-results-analysis" class="mt-2 space-y-1 bg-white border border-gray-200 rounded-md max-h-40 overflow-y-auto hidden">
+                                </div>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-700">Análisis Comercial por zona</h3>
+                            <p class="text-sm text-gray-600">Seleccione un predio en el mapa (o busque una dirección) para realizar el análisis.</p>
+                        </div>
+                        <div id="analysis-tool-content" class="hidden space-y-4 pt-4 border-t border-dashed">
+                            <div>
+                                <label for="comercio-select-sidebar" class="block text-sm font-medium text-gray-700">Seleccione tipo de comercio</label>
+                                <select id="comercio-select-sidebar" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                    <option value="">-- Elija una categoría --</option>
+                                    </select>
+                            </div>
+                            <div id="analysis-results-sidebar" class="space-y-4 hidden">
+                                <div class="bg-gray-50 p-3 rounded-lg">
+                                    <h4 class="font-semibold text-gray-800">Permisos de Uso (según PRC)</h4>
+                                    <p class="text-sm"><b class="text-green-600">Permitido:</b> <span id="permiso-permitido-sidebar">--</span></p>
+                                    <p class="text-sm"><b class="text-red-600">Prohibido:</b> <span id="permiso-prohibido-sidebar">--</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 border-t">
+                    <button id="generate-report-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition disabled:bg-gray-400" disabled>
+                        Generar Ficha Informativa (PDF)
+                    </button>
+                </div>
+            </aside>
+
+            <main class="flex-1 h-full relative">
+                
+                <button id="openSidebarBtn" class="lg:hidden absolute top-4 left-4 z-20 p-2 bg-white rounded-md shadow-md">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+
+                <div id="map" class="w-full h-full relative overflow-hidden">
+                    </div>
+
+                <div class="absolute top-4 right-4 z-20 bg-white rounded-lg shadow-xl w-64 p-4">
+                    <h3 class="font-bold mb-3 text-gray-700">Mapa Base</h3>
+                    <div class="space-y-2">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="radio" name="basemap" value="osm" checked class="basemap-toggle h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm">OpenStreetMap (Default)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="radio" name="basemap" value="cartodb-light" class="basemap-toggle h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm">CartoDB Light</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="absolute top-40 right-4 z-20 bg-white rounded-lg shadow-xl w-64 p-4 max-h-[calc(100vh-250px)] overflow-y-auto">
+                    <h3 class="font-bold mb-3 text-gray-700">Capas de Datos</h3>
+                    <div class="space-y-2">
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="toggle-prc-layer" class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm">PRC Providencia (Zonificación)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="toggle-poblacion-layer" class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm">Población Flotante y Residente</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="toggle-construccion-layer" class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm">Usos de Suelo (Construcción)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="toggle-usos-layer" class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm">Usos de Suelo (Autorizados)</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="toggle-predial-layer" class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm">Subdivisión Predial</span>
+                        </label>
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="toggle-locales-layer" class="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm">Locales Comerciales</span>
+                        </label>
+                    </div>
+                </div>
+
+
+                <div class="absolute bottom-4 right-4 z-20 flex flex-col space-y-1">
+                    <button class="bg-white w-10 h-10 flex items-center justify-center rounded-t-md shadow hover:bg-gray-100 text-xl font-bold" id="zoom-in">+</button>
+                    <button class="bg-white w-10 h-10 flex items-center justify-center rounded-b-md shadow hover:bg-gray-100 text-xl font-bold" id="zoom-out">-</button>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="reportModal" class="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4 hidden opacity-0 modal-hidden-print">
+        <div id="modal-content" class="modal-content bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col transform scale-95">
+            <div class="p-4 border-b flex justify-between items-center modal-print-hide">
+                <h2 class="text-2xl font-bold text-gray-800">Ficha Informativa de Predio</h2>
+                <button id="closeModalBtn" class="p-1 rounded-full hover:bg-gray-200">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="flex-grow overflow-y-auto p-6">
+                <div class="printable-section grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-1 space-y-4">
+                        <div class="border rounded-lg p-3">
+                            <h4 class="font-bold text-sm mb-2">UBICACIÓN</h4>
+                            <p class="text-sm" id="report-address">--</p>
+                            <p class="text-xs text-gray-500">Providencia, Santiago</p>
+                        </div>
+                        <div class="border rounded-lg p-3">
+                            <h4 class="font-bold text-sm mb-2">CROQUIS DEL PREDIO</h4>
+                            <div id="report-map-sketch" class="w-full h-40 bg-gray-200 map-bg">
+                                </div>
+                        </div>
+                    </div>
+                    <div class="md:col-span-2 space-y-4">
+                        <table class="w-full text-sm text-left text-gray-500 printable-table">
+                            <tbody>
+                                <tr class="bg-white border-b"><th scope="row" class="px-3 py-2 font-medium text-gray-900">ROL CATASTRAL</th><td class="px-3 py-2" id="report-rol">--</td></tr>
+                                <tr class="bg-gray-50 border-b"><th scope="row" class="px-3 py-2 font-medium text-gray-900">SUPERFICIE PREDIAL</th><td class="px-3 py-2" id="report-area">-- m²</td></tr>
+                            </tbody>
+                        </table>
+                        <h3 class="font-bold text-lg pt-4">Normas de control de la urbanización y edificación</h3>
+                        <table class="w-full text-sm text-left text-gray-500 printable-table">
+                            <tbody>
+                                <tr class="bg-white border-b"><th scope="row" class="px-3 py-2 font-medium text-gray-900">Zonificación PRC</th><td class="px-3 py-2" id="report-zone">--</td></tr>
+                                <tr class="bg-gray-50 border-b"><th scope="row" class="px-3 py-2 font-medium text-gray-900">Coeficiente de ocupación de suelo</th><td class="px-3 py-2" id="report-ocupacion">--</td></tr>
+                                <tr class="bg-white border-b"><th scope="row" class="px-3 py-2 font-medium text-gray-900">Coeficiente de constructibilidad</th><td class="px-3 py-2" id="report-buildability">--</td></tr>
+                                <tr class="bg-gray-50 border-b"><th scope="row" class="px-3 py-2 font-medium text-gray-900">Altura máxima de la edificación</th><td class="px-3 py-2" id="report-altura">--</td></tr>
+                                <tr class="bg-white border-b"><th scope="row" class="px-3 py-2 font-medium text-gray-900">NOTA ADICIONAL (*)</th><td class="px-3 py-2" id="report-nota">--</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-gray-50 border-t flex justify-end modal-print-hide">
+                <button id="print-report-btn" class="bg-gray-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600">Imprimir</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="analysisModal" class="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4 hidden opacity-0 modal-hidden-print">
+        <div id="analysis-modal-content" class="modal-content bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col transform scale-95">
+            <div class="p-4 border-b flex justify-between items-center modal-print-hide">
+                <h2 class="text-2xl font-bold text-gray-800">Análisis Comercial de Entorno</h2>
+                <button id="closeAnalysisModalBtn" class="p-1 rounded-full hover:bg-gray-200">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <div class="flex-grow overflow-y-auto p-6 space-y-6">
+                
+                <div class="printable-section grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="border rounded-lg p-4">
+                        <h4 class="font-bold text-sm mb-2">UBICACIÓN DEL PROYECTO</h4>
+                        <p class="text-sm" id="analysis-address">--</p>
+                        <p class="text-xs text-gray-500">Providencia, Santiago</p>
+                        <div id="report-map-sketch-comercial" class="w-full h-40 bg-gray-200 map-bg mt-2"></div>
+                    </div>
+                    <div class="border rounded-lg p-4 space-y-3">
+                        <div>
+                            <label for="comercio-select-modal" class="block text-sm font-medium text-gray-700">Seleccione tipo de comercio a establecer</label>
+                            <select id="comercio-select-modal" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm modal-print-hide">
+                                </select>
+                            <div class="hidden print:block text-sm mt-2">
+                                <b>Comercio Seleccionado:</b> <span id="comercio-print-selection"></span>
+                            </div>
+                        </div>
+                        <div id="analysis-permisos" class="hidden">
+                            <h4 class="font-bold text-sm mb-1">Permisos de Uso (según PRC)</h4>
+                            <p class="text-xs bg-green-50 text-green-700 p-2 rounded"><b class="font-semibold">Permitido:</b> <span id="analysis-permiso-permitido">--</span></p>
+                            <p class="text-xs bg-red-50 text-red-700 p-2 mt-1 rounded"><b class="font-semibold">Prohibido:</b> <span id="analysis-permiso-prohibido">--</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="analysis-competencia-section" class="hidden space-y-4 printable-section">
+                    <hr>
+                    <h3 class="font-bold text-lg">Análisis de Competencia (Radio de 400m)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="border rounded-lg p-4">
+                            <h4 class="font-bold text-sm mb-2">LOCALIZACIÓN DE COMPETENCIA</h4>
+                            <div id="competitor-map-sketch" class="w-full h-64 bg-gray-200 map-bg"></div>
+                        </div>
+                        <div class="border rounded-lg p-4">
+                            <h4 class="font-bold text-sm mb-2">ANÁLISIS COMERCIAL</h4>
+                            <div class="grid grid-cols-2 gap-2 text-center">
+                                <div class="bg-blue-50 p-2 rounded">
+                                    <span class="text-2xl font-bold text-blue-700" id="analysis-total-locales">0</span>
+                                    <span class="text-xs block text-gray-600">Locales en el radio</span>
+                                </div>
+                                <div class="bg-blue-50 p-2 rounded">
+                                    <span class="text-2xl font-bold text-blue-700" id="analysis-total-workers">0</span>
+                                    <span class="text-xs block text-gray-600">Trabajadores totales</span>
+                                </div>
+                                
+                                <div class="bg-green-50 p-2 rounded hidden">
+                                    <span class="text-2xl font-bold text-green-700" id="analysis-total-ingresos">0</span>
+                                    <span class="text-xs block text-gray-600">Ingresos Totales (UF)</span>
+                                </div>
+                                <div class="bg-green-50 p-2 rounded hidden">
+                                    <span class="text-2xl font-bold text-green-700" id="analysis-avg-ingresos">0</span>
+                                    <span class="text-xs block text-gray-600">Ingresos Promedio (UF)</span>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gray-50 p-2 rounded text-center mt-2 hidden">
+                                <span class="text-2xl font-bold text-gray-700" id="analysis-avg-workers">0</span>
+                                <span class="text-xs block text-gray-600">Promedio de trabajadores por local</span>
+                            </div>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                <div class="w-full">
+                                    <h4 class="font-bold text-sm mb-2 text-center">ESTATUS DE INGRESOS (UF)</h4>
+                                    <div class="w-full max-w-xs mx-auto">
+                                        <canvas id="estatus-chart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="w-full">
+                                    <h4 class="font-bold text-sm mb-2 text-center">TAMAÑO DE EMPRESA</h4>
+                                    <div class="w-full max-w-xs mx-auto">
+                                        <canvas id="tamano-chart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="analysis-poblacion-section" class="space-y-4 printable-section">
+                    <hr>
+                    <h3 class="font-bold text-lg">Análisis de Población</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="border rounded-lg p-4">
+                            <h4 class="font-bold text-sm mb-2">POBLACIÓN EN TESELA(S) DEL PREDIO</h4>
+                            <div id="local-population-table" class="text-xs"></div>
+                        </div>
+                        <div class="border rounded-lg p-4">
+                            <h4 class="font-bold text-sm mb-2">POBLACIÓN EN TESELA(S) CIRCUNDANTES</h4>
+                            <div id="surrounding-population-table" class="text-xs"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="p-4 bg-gray-50 border-t flex justify-end modal-print-hide">
+                <button id="print-analysis-btn" class="bg-gray-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600">Imprimir</button>
+            </div>
+        </div>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            crossorigin=""></script>
+
+<script>
+    // URLs de los mapas base
+    const BASEMAPS = {
+        'osm': {
+            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            attribution: '© OpenStreetMap contributors',
+            layer: null
+        },
+        'cartodb-light': {
+            url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+            attribution: '© CartoDB | © OpenStreetMap contributors',
+            layer: null
+        }
+    };
+
+    // URL de Nominatim
+    const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/';
+
+    // Coordenadas de Santiago/Providencia (Centro de vista inicial)
+    const INITIAL_LAT = -33.4312; 
+    const INITIAL_LNG = -70.6186;
+    const INITIAL_ZOOM = 14;
+
+    let map = null; 
+    let currentBasemapLayer = null; 
+    let currentMarker = null; 
+    let selectedParcelData = null;
+    
+    // Variables para los modales
+    let reportMap = null; 
+    let analysisMap = null;
+    let competitorMap = null;
+    let competitorLayerGroup = null; // Capa para marcadores de competencia
+    let chartInstance = null; 
+    let tamanoChartInstance = null; // --- NUEVO: Instancia para el segundo gráfico
+    
+    // Estado de la aplicación
+    let analysisMode = 'search'; // 'search' (normativa) o 'analysis' (comercial)
+
+    // Variables para todas las capas
+    let prcLayer = null; 
+    let poblacionLayer = null; 
+    let construccionLayer = null;
+    let usosLayer = null;
+    let predialLayer = null;
+    let localesLayer = null;
+
+    // Variables para almacenar los datos en memoria para análisis
+    let prcFeatureCollection = null; 
+    let isPrcDataLoading = false;
+    let construccionFeatureCollection = null;
+    let isConstruccionDataLoading = false;
+    let usosFeatureCollection = null;
+    let isUsosDataLoading = false;
+    let poblacionFeatureCollection = null;
+    let isPoblacionDataLoading = false;
+    let localesFeatureCollection = null;
+    let isLocalesDataLoading = false;
+    let predialFeatureCollection = null; // Para análisis de clic en pin
+    let isPredialDataLoading = false;
+
+    // --- MODIFICACIÓN: Mover constantes al ámbito global ---
+    const TIPO_COMERCIO_LISTA = [
+        "AGENCIA DE TURISMO", "ALMACEN", "BANCO", "BODEGA", "CAFETERIA", "CARNICERIA", 
+        "CENTRO DE DISTRIBUCION / LOGISTICA", "CENTRO DE EDUCACION", "CENTRO DE EVENTOS / SALON DE CONFERENCIAS",
+        "CENTRO DE NEGOCIOS / COWORKING / OFICINAS CORPORATIVAS", "CENTRO MEDICO", "CENTRO ODONTOLOGICO", "CLINICA",
+        "EMPRESA DE ALQUILER DE VEHICULOS / GARAJE / TALLER", "ESTACIONAMIENTOS", "FARMACIA", "FERRETERIA", "GIMNASIO",
+        "HOGAR ADULTO MAYOR", "HOTEL", "INDUSTRIA / ACTIVIDAD: AGRICULTURA", "INDUSTRIA / ACTIVIDAD: COMUNICACIONES",
+        "INDUSTRIA / ACTIVIDAD: CONSTRUCCION", "INDUSTRIA / ACTIVIDAD: EDITORIAL", "INDUSTRIA / ACTIVIDAD: ENERGIA",
+        "INDUSTRIA / ACTIVIDAD: INMOBILIARIA", "INDUSTRIA / ACTIVIDAD: MINERIA", "INDUSTRIA / ACTIVIDAD: SEGURIDAD",
+        "INDUSTRIA / ACTIVIDAD: SERVICIOS TECNICOS", "JOYERIA", "KINESIOLOGO", "LIBRERIA", "MUSEO", "NO CLASIFICADO",
+        "OFICINA DE TECNOLOGIA / AGENCIA DE DISEÑO/SOFTWARE", "OFICINAS DE SERVICIOS PROFESIONALES / CONSULTORIAS",
+        "OTROS CONCEPTOS GENERALES", "PANADERIA", "PASTELERIA", "PELUQUERIA", "PERFUMERIA", "PESCADERIA", "RESTAURANT",
+        "SUPERMERCADO", "TEATRO", "TIENDA DE COMERCIO", "TIENDA DE ELECTRONICA", "TIENDA DE HOGAR", "TIENDA DE MASCOTAS",
+        "TIENDA DE RELOJERIA", "TIENDA DE ROPA", "TIENDA DEPORTIVA", "VERDULERIA"
+    ];
+    
+    const COMERCIO_TO_CATEGORIA = {
+        "AGENCIA DE TURISMO": "Servicios", "ALMACEN": "Comercio", "BANCO": "Servicios", "BODEGA": "Comercio",
+        "CAFETERIA": "Comercio", "CARNICERIA": "Comercio", "CENTRO DE DISTRIBUCION / LOGISTICA": "Comercio",
+        "CENTRO DE EDUCACION": "Educación", "CENTRO DE EVENTOS / SALON DE CONFERENCIAS": "Culto y Cultura",
+        "CENTRO DE NEGOCIOS / COWORKING / OFICINAS CORPORATIVAS": "Servicios", "CENTRO MEDICO": "Servicios",
+        "CENTRO ODONTOLOGICO": "Servicios", "CLINICA": "Salud",
+        "EMPRESA DE ALQUILER DE VEHICULOS / GARAJE / TALLER": "Comercio", "ESTACIONAMIENTOS": "Servicios",
+        "FARMACIA": "Comercio", "FERRETERIA": "Comercio", "GIMNASIO": "Deporte", "HOGAR ADULTO MAYOR": "Social",
+        "HOTEL": "Residencial", "INDUSTRIA / ACTIVIDAD: AGRICULTURA": "Actividades productivas",
+        "INDUSTRIA / ACTIVIDAD: COMUNICACIONES": "Culto y Cultura", "INDUSTRIA / ACTIVIDAD: CONSTRUCCION": "Actividades productivas",
+        "INDUSTRIA / ACTIVIDAD: EDITORIAL": "Actividades productivas", "INDUSTRIA / ACTIVIDAD: ENERGIA": "Infraestructura",
+        "INDUSTRIA / ACTIVIDAD: INMOBILIARIA": "Servicios", "INDUSTRIA / ACTIVIDAD: MINERIA": "Actividades productivas",
+        "INDUSTRIA / ACTIVIDAD: SEGURIDAD": "Seguridad", "INDUSTRIA / ACTIVIDAD: SERVICIOS TECNICOS": "Servicios",
+        "JOYERIA": "Comercio", "KINESIOLOGO": "Salud", "LIBRERIA": "Comercio", "MUSEO": "Culto y Cultura",
+        "NO CLASIFICADO": "(No Clasificado)", "OFICINA DE TECNOLOGIA / AGENCIA DE DISEÑO/SOFTWARE": "Servicios",
+        "OFICINAS DE SERVICIOS PROFESIONALES / CONSULTORIAS": "Servicios", "OTROS CONCEPTOS GENERALES": "(No Clasificado)",
+        "PANADERIA": "Comercio", "PASTELERIA": "Comercio", "PELUQUERIA": "Servicios", "PERFUMERIA": "Comercio",
+        "PESCADERIA": "Comercio", "RESTAURANT": "Comercio", "SUPERMERCADO": "Comercio", "TEATRO": "Culto y Cultura",
+        "TIENDA DE COMERCIO": "Comercio", "TIENDA DE ELECTRONICA": "Comercio", "TIENDA DE HOGAR": "Comercio",
+        "TIENDA DE MASCOTAS": "Comercio", "TIENDA DE RELOJERIA": "Comercio", "TIENDA DE ROPA": "Comercio",
+        "TIENDA DEPORTIVA": "Comercio", "VERDULERIA": "Comercio"
+    };
+    
+    const CATEGORIA_TO_USO_KEY = {
+        "Servicios": "Servicios", "Comercio": "Comercio", "Educación": "Educación", "Culto y Cultura": "Culto y Cultura",
+        "Salud": "Salud", "Deporte": "Deporte", "Social": "Social", "Residencial": "Residencial",
+        "Actividades productivas": "Actividades productivas", "Infraestructura": "Infraestructura", "Seguridad": "Seguridad",
+        "(No Clasificado)": null
+    };
+    // --- FIN MODIFICACIÓN ---
+
+    // Helper para truncar números
+    const truncateNumericValue = (value) => {
+        if (typeof value === 'number') {
+            return Math.trunc(value * 10) / 10;
+        }
+        return value;
+    };
+
+    // --- CORRECCIÓN DE FUNCIÓN fixEncodingErrors ---
+    const fixEncodingErrors = (str) => {
+        if (typeof str !== 'string') return str;
+        
+        // 1. Reemplazar los más largos y específicos primero
+        return str
+            .replace(/Ã¡Â¡/g, 'á')  // MÃ¡Â¡ximo
+        // 2. Reemplazar los de 2 caracteres
+            .replace(/Ã¡/g, 'á')    // Ã¡reas
+            .replace(/Ã©/g, 'é')
+            .replace(/Ã³/g, 'ó')    // EdificaciÃ³n
+            .replace(/Ãº/g, 'ú')    // pÃºblico
+            .replace(/Ã±/g, 'ñ')
+            .replace(/Ã‰/g, 'É')
+            .replace(/Ã“/g, 'Ó')
+            .replace(/Ãš/g, 'Ú')
+            .replace(/Ã‘/g, 'Ñ')
+        // 3. Reemplazar los de 1 caracter (problemáticos) al final
+            .replace(/Ã/g, 'í')    // cientÃ­fico
+            .replace(/Â/g, '');    // Artefacto
+    };
+    // --- FIN DE CORRECCIÓN ---
+
+
+    const fixObjectStrings = (obj) => {
+        if (!obj) return obj;
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                const value = obj[key];
+                if (typeof value === 'string') {
+                    obj[key] = fixEncodingErrors(value);
+                } else if (typeof value === 'object' && value !== null) {
+                    fixObjectStrings(value);
+                }
+            }
+        }
+        return obj;
+    };
+
+    // Helper para formatear dirección de Nominatim
+    const formatNominatimAddress = (address) => {
+        if (!address) return 'Dirección no encontrada';
+        
+        const street = address.road || '';
+        const number = address.house_number || '';
+        const suburb = address.suburb || address.city || 'Providencia'; 
+        const province = address.province || 'Provincia de Santiago';
+        const country = address.country || 'Chile';
+
+        const streetAndNumber = [street, number].filter(Boolean).join(' ');
+        const locationParts = [suburb, province, country].filter(Boolean);
+
+        if (streetAndNumber) {
+            return [streetAndNumber, ...locationParts].join(', ') + '.';
+        }
+        return locationParts.join(', ') + '.';
+    };
+
+    // Helper para mostrar atributos en el sidebar
+    const showFeatureDetails = (properties, title) => {
+        const featureDetailsDiv = document.getElementById('feature-details');
+        const featureTitleEl = document.getElementById('feature-title');
+        const featureContentEl = document.getElementById('feature-content');
+
+        featureContentEl.innerHTML = ''; 
+        featureTitleEl.textContent = title;
+
+        if (!properties || Object.keys(properties).length === 0) {
+            featureContentEl.innerHTML = '<p class="text-gray-500 italic">No hay propiedades para mostrar.</p>';
+        } else {
+            for (const key in properties) {
+                if (Object.prototype.hasOwnProperty.call(properties, key)) {
+                    const rawVal = properties[key];
+                    const val = truncateNumericValue(rawVal);
+                    const item = document.createElement('div');
+                    const displayValue = val !== null && val !== "" ? val : "--";
+                    item.innerHTML = `<span class="font-semibold text-gray-600">${key}:</span> <span class="break-words">${displayValue}</span>`;
+                    featureContentEl.appendChild(item);
+                }
+            }
+        }
+
+        document.getElementById('pin-details').classList.add('hidden');
+        document.getElementById('no-property-selected').classList.add('hidden');
+        featureDetailsDiv.classList.remove('hidden');
+    };
+
+    // Helper para crear contenido de Popups
+    const createPopupContent = (title, properties) => {
+        let popupContent = `<b style="font-size: 14px;">${title}</b><hr style="margin: 4px 0;">`;
+        if (!properties || Object.keys(properties).length === 0) {
+            popupContent += '<em>No hay datos.</em>';
+            return popupContent;
+        }
+        
+        for (const key in properties) {
+            if (Object.prototype.hasOwnProperty.call(properties, key)) {
+                const rawVal = properties[key];
+                const val = truncateNumericValue(rawVal);
+                const displayValue = val !== null && val !== "" ? val : "--";
+                popupContent += `<b style="color: #555;">${key}:</b> ${displayValue}<br>`;
+            }
+        }
+        return popupContent;
+    };
+
+    // --- Funciones de carga de datos y análisis ---
+
+    /**
+     * Carga el GeoJSON del PRC (Zonificación) en memoria.
+     */
+    const loadPrcData = (callback) => {
+        if (prcFeatureCollection) {
+            if (callback) callback(prcFeatureCollection);
+            return;
+        }
+        if (isPrcDataLoading) {
+            setTimeout(() => loadPrcData(callback), 100);
+            return;
+        }
+        isPrcDataLoading = true;
+        const url = 'https://raw.githubusercontent.com/datahubprovidencia25/DATAHUB25MVP/refs/heads/main/PRC_PROVIDENCIA.geojson';
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                data.features.forEach(feature => {
+                    if (feature.properties) {
+                        feature.properties = fixObjectStrings(feature.properties);
+                    }
+                });
+                prcFeatureCollection = data;
+                isPrcDataLoading = false;
+                if (callback) callback(prcFeatureCollection);
+            })
+            .catch(error => {
+                console.error('Error crítico al cargar capa PRC:', error);
+                isPrcDataLoading = false;
+            });
+    };
+
+    /**
+     * Carga el GeoJSON de Construcción (para Altura) en memoria.
+     */
+    const loadConstruccionData = (callback) => {
+        if (construccionFeatureCollection) {
+            if (callback) callback(construccionFeatureCollection);
+            return;
+        }
+        if (isConstruccionDataLoading) {
+            setTimeout(() => loadConstruccionData(callback), 100);
+            return;
+        }
+        isConstruccionDataLoading = true;
+        const url = 'https://raw.githubusercontent.com/datahubprovidencia25/DATAHUB25MVP/refs/heads/main/PRC_CONSTRUCCION_PROVIDENCIA.geojson';
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                data.features.forEach(feature => {
+                    if (feature.properties) {
+                        feature.properties = fixObjectStrings(feature.properties);
+                    }
+                });
+                construccionFeatureCollection = data;
+                isConstruccionDataLoading = false;
+                if (callback) callback(construccionFeatureCollection);
+            })
+            .catch(error => {
+                console.error('Error crítico al cargar capa Construcción:', error);
+                isConstruccionDataLoading = false;
+            });
+    };
+
+    /**
+     * Carga el GeoJSON de Usos (para Permisos) en memoria.
+     */
+    const loadUsosData = (callback) => {
+        if (usosFeatureCollection) {
+            if (callback) callback(usosFeatureCollection);
+            return;
+        }
+        if (isUsosDataLoading) {
+            setTimeout(() => loadUsosData(callback), 100);
+            return;
+        }
+        isUsosDataLoading = true;
+        const url = 'https://raw.githubusercontent.com/datahubprovidencia25/DATAHUB25MVP/refs/heads/main/PRC_USOS_PROVIDENCIA.geojson';
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                data.features.forEach(feature => {
+                    if (feature.properties) {
+                        feature.properties = fixObjectStrings(feature.properties);
+                    }
+                });
+                usosFeatureCollection = data;
+                isUsosDataLoading = false;
+                if (callback) callback(usosFeatureCollection);
+            })
+            .catch(error => {
+                console.error('Error crítico al cargar capa Usos:', error);
+                isUsosDataLoading = false;
+            });
+    };
+
+    /**
+     * Carga el GeoJSON de Población (Teselas) en memoria.
+     */
+    const loadPoblacionData = (callback) => {
+        if (poblacionFeatureCollection) {
+            if (callback) callback(poblacionFeatureCollection);
+            return;
+        }
+        if (isPoblacionDataLoading) {
+            setTimeout(() => loadPoblacionData(callback), 100);
+            return;
+        }
+        isPoblacionDataLoading = true;
+        const url = 'https://raw.githubusercontent.com/datahubprovidencia25/DATAHUB25MVP/refs/heads/main/TESELAS_POBLACION_FLOTANTE_Y_RESIDENTE_PROVIDENCIA.geojson';
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                poblacionFeatureCollection = data;
+                isPoblacionDataLoading = false;
+                if (callback) callback(poblacionFeatureCollection);
+            })
+            .catch(error => {
+                console.error('Error crítico al cargar capa Población:', error);
+                isPoblacionDataLoading = false;
+            });
+    };
+
+    /**
+     * Carga el GeoJSON de Locales Comerciales (para Competencia) en memoria.
+     */
+    const loadLocalesComercialesData = (callback) => {
+        if (localesFeatureCollection) {
+            if (callback) callback(localesFeatureCollection);
+            return;
+        }
+        if (isLocalesDataLoading) {
+            setTimeout(() => loadLocalesComercialesData(callback), 100);
+            return;
+        }
+        isLocalesDataLoading = true;
+        const url = 'https://raw.githubusercontent.com/datahubprovidencia25/DATAHUB25MVP/refs/heads/main/LOCALES_COMERCIALES_CATEGORIZADOS.geojson';
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                data.features.forEach(feature => {
+                    if (feature.properties) {
+                        feature.properties = fixObjectStrings(feature.properties);
+                    }
+                });
+                localesFeatureCollection = data;
+                isLocalesDataLoading = false;
+                if (callback) callback(localesFeatureCollection);
+            })
+            .catch(error => {
+                console.error('Error crítico al cargar capa Locales Comerciales:', error);
+                isLocalesDataLoading = false;
+            });
+    };
+    
+    /**
+     * Carga el GeoJSON de Predios (para clics) en memoria.
+     */
+    const loadPredialData = (callback) => {
+        if (predialFeatureCollection) {
+            if (callback) callback(predialFeatureCollection);
+            return;
+        }
+        if (isPredialDataLoading) {
+            setTimeout(() => loadPredialData(callback), 100);
+            return;
+        }
+        isPredialDataLoading = true;
+        const url = 'https://raw.githubusercontent.com/datahubprovidencia25/DATAHUB25MVP/refs/heads/main/DIVISION_PREDIAL_PROVIDENCIA.geojson';
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                data.features.forEach(feature => {
+                    if (feature.properties) {
+                        feature.properties = fixObjectStrings(feature.properties);
+                    }
+                });
+                predialFeatureCollection = data;
+                isPredialDataLoading = false;
+                if (callback) callback(predialFeatureCollection);
+            })
+            .catch(error => {
+                console.error('Error crítico al cargar capa Predial:', error);
+                isPredialDataLoading = false;
+            });
+    };
+
+
+    /**
+     * Usa Turf.js para encontrar las PROPIEDADES del polígono PRC (Zonificación)
+     */
+    const findPrcProperties = (center) => {
+        if (!prcFeatureCollection || !center) return null;
+        try {
+            const point = turf.point([center.lng, center.lat]);
+            for (const feature of prcFeatureCollection.features) {
+                const isInside = turf.booleanPointInPolygon(point, feature.geometry);
+                if (isInside) {
+                    return feature.properties; // Devolver el objeto de propiedades
+                }
+            }
+        } catch (error) {
+            console.error("Error en análisis Turf.js (Zona):", error);
+        }
+        return null; // No encontrado
+    };
+
+    /**
+     * Usa Turf.js para encontrar las PROPIEDADES del polígono Construcción (Altura, Coeficientes)
+     */
+    const findConstruccionProperties = (center) => {
+        if (!construccionFeatureCollection || !center) return null;
+        try {
+            const point = turf.point([center.lng, center.lat]);
+            for (const feature of construccionFeatureCollection.features) {
+                const isInside = turf.booleanPointInPolygon(point, feature.geometry);
+                if (isInside) {
+                    return feature.properties; // Devolver el objeto de propiedades
+                }
+            }
+        } catch (error) {
+            console.error("Error en análisis Turf.js (Construcción):", error);
+        }
+        return null; // No encontrado
+    };
+    
+    /**
+     * Usa Turf.js para encontrar las PROPIEDADES del polígono Usos (Permisos)
+     */
+    const findUsosProperties = (center) => {
+        if (!usosFeatureCollection || !center) return null;
+        try {
+            const point = turf.point([center.lng, center.lat]);
+            for (const feature of usosFeatureCollection.features) {
+                const isInside = turf.booleanPointInPolygon(point, feature.geometry);
+                if (isInside) {
+                    return feature.properties; // Devolver el objeto de propiedades
+                }
+            }
+        } catch (error) {
+            console.error("Error en análisis Turf.js (Usos):", error);
+        }
+        return null; // No encontrado
+    };
+    
+    /**
+     * Usa Turf.js para encontrar la TESELA de Población (Feature completa)
+     */
+    const findPoblacionFeature = (center) => {
+        if (!poblacionFeatureCollection || !center) return null;
+        try {
+            const point = turf.point([center.lng, center.lat]);
+            for (const feature of poblacionFeatureCollection.features) {
+                const isInside = turf.booleanPointInPolygon(point, feature.geometry);
+                if (isInside) {
+                    return feature; // Devolver la feature completa (props + geometría)
+                }
+            }
+        } catch (error) {
+            console.error("Error en análisis Turf.js (Población):", error);
+        }
+        return null; // No encontrado
+    };
+
+    /**
+     * Usa Turf.js para encontrar todas las teselas vecinas
+     */
+    const findSurroundingPoblacion = (primaryFeature, allPoblacionFeatures) => {
+        if (!primaryFeature || !allPoblacionFeatures) return [];
+        const neighbors = [];
+        const primaryGeom = primaryFeature.geometry;
+        
+        turf.featureEach(allPoblacionFeatures, (currentFeature) => {
+            // Evitar compararse consigo mismo
+            if (JSON.stringify(primaryFeature.geometry) === JSON.stringify(currentFeature.geometry)) {
+                return;
+            }
+            
+            try {
+                // Usamos 'touches' (tocar bordes) que es más preciso para hexágonos adyacentes
+                if (turf.booleanTouches(primaryGeom, currentFeature.geometry)) {
+                    neighbors.push(currentFeature.properties);
+                }
+            } catch (e) {
+                // A veces turf.booleanTouches falla con geometrías complejas, usamos intersects como fallback
+                try {
+                    // Solo añadir si TOCA, no si se superpone (lo que sería un error de datos)
+                    if (turf.booleanIntersects(primaryGeom, currentFeature.geometry) && !turf.booleanContains(primaryGeom, currentFeature.geometry) && !turf.booleanContains(currentFeature.geometry, primaryGeom)) {
+                         neighbors.push(currentFeature.properties);
+                    }
+                } catch (e2) {
+                    console.error("Error de Turf.js (Intersección Teselas):", e2);
+                }
+            }
+        });
+        return neighbors; // Devuelve un array de propiedades de los vecinos
+    };
+
+    /**
+     * Suma las propiedades de un array de teselas de población
+     */
+    const sumPoblacionProperties = (propArray) => {
+        const sum = {
+            Poblacion_residente: 0, POB_0_5: 0, POB_6_14: 0, POB_15_64: 0, POB_65_MAS: 0, TOT_Hombres: 0, TOT_Mujeres: 0,
+            Poblacion_Flotante: 0, '00:00 A 02:30': 0, '03:00 A 05:30': 0, '06:00 A 08:30': 0,
+            '09:00 A 11:30': 0, '12:00 A 14:30': 0, '15:00 A 17:30': 0, '18:00 A 20:30': 0, '21:00 A 23:30': 0
+        };
+        
+        propArray.forEach(props => {
+            for (const key in sum) {
+                if (props.hasOwnProperty(key)) {
+                    sum[key] += (props[key] || 0);
+                }
+            }
+        });
+        
+        return sum;
+    };
+
+    /**
+     * Genera el HTML para la tabla de población
+     */
+    const createPoblacionTable = (popProps) => {
+        if (!popProps || (popProps.Poblacion_residente === 0 && popProps.Poblacion_Flotante === 0)) {
+            return '<p class="text-gray-500 italic">No se encontraron datos de población.</p>';
+        }
+        
+        // Formatear los números aquí
+        return `
+            <b class="text-gray-700">Población Residente: ${Math.round(popProps.Poblacion_residente || 0)}</b>
+            <ul class="list-disc pl-4 mb-2">
+                <li>Cantidad de Hombres: ${Math.round(popProps.TOT_Hombres || 0)}</li>
+                <li>Cantidad de Mujeres: ${Math.round(popProps.TOT_Mujeres || 0)}</li>
+                <li>0-5 años: ${Math.round(popProps.POB_0_5 || 0)}</li>
+                <li>6-14 años: ${Math.round(popProps.POB_6_14 || 0)}</li>
+                <li>15-64 años: ${Math.round(popProps.POB_15_64 || 0)}</li>
+                <li>65+ años: ${Math.round(popProps.POB_65_MAS || 0)}</li>
+            </ul>
+            <b class="text-gray-700">Población Flotante: ${Math.round(popProps.Poblacion_Flotante || 0)} (Total 24h)</b>
+            <ul class="list-disc pl-4">
+                <li>00:00-02:30: ${Math.round(popProps['00:00 A 02:30'] || 0)}</li>
+                <li>03:00-05:30: ${Math.round(popProps['03:00 A 05:30'] || 0)}</li>
+                <li>06:00-08:30: ${Math.round(popProps['06:00 A 08:30'] || 0)}</li>
+                <li>09:00-11:30: ${Math.round(popProps['09:00 A 11:30'] || 0)}</li>
+                <li>12:00-14:30: ${Math.round(popProps['12:00 A 14:30'] || 0)}</li>
+                <li>15:00-17:30: ${Math.round(popProps['15:00 A 17:30'] || 0)}</li>
+                <li>18:00-20:30: ${Math.round(popProps['18:00 A 20:30'] || 0)}</li>
+                <li>21:00-23:30: ${Math.round(popProps['21:00 A 23:30'] || 0)}</li>
+            </ul>
+        `;
+    };
+
+    /**
+     * Usa Turf.js para encontrar todos los locales comerciales en un radio de 400m
+     */
+    const findCompetitors = (center, localesCollection) => {
+        const competitors = [];
+        if (!localesCollection || !center) return competitors;
+
+        const centerPoint = turf.point([center.lng, center.lat]);
+        
+        try {
+            turf.featureEach(localesCollection, (feature) => {
+                if (feature.geometry) { // Asegurarse de que la geometría existe
+                    const distance = turf.distance(centerPoint, feature.geometry, { units: 'meters' });
+                    if (distance <= 400) {
+                        competitors.push(feature);
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Error en análisis Turf.js (Competidores):", error);
+        }
+        return competitors;
+    };
+    
+
+    /**
+     * Parsea el string 'SUPERFICIE EDIFICABLE' para extraer los coeficientes.
+     */
+    const parseSuperficieEdificable = (superficieString) => {
+        const result = {
+            constructibilidad: [],
+            ocupacion: []
+        };
+
+        if (typeof superficieString !== 'string') {
+            return { constructibilidad: '--', ocupacion: '--' };
+        }
+
+        // Definir los términos de búsqueda (corregido "edficicacion")
+        const constructibilidadTerms = [
+            "Coeficiente Constructibilidad - edificacion Aislada",
+            "Coeficiente Constructibilidad - edificacion continua",
+            "Coeficiente de Constructibilidad - edificacion adosada"
+        ];
+        
+        const ocupacionTerms = [
+            "Coeficiente de Ocupación Suelo - Construccion Aislada (Pisos Superiores)",
+            "Coeficiente de Ocupación Suelo - edificacion continua (Pisos Superiores)",
+            "Coeficiente de Ocupación Suelo - Construccion Aislada (Primer Piso)",
+            "Coeficiente de Ocupación Suelo - Edificacion Adosada (Primer Piso)",
+            "Coeficiente de Ocupación Suelo - edificacion Continua (Primer Piso)"
+        ];
+
+        // Dividir el string por el punto y coma
+        const parts = superficieString.split(';').map(s => s.trim());
+
+        // Clasificar cada parte
+        parts.forEach(part => {
+            // Usar 'some' para ver si la 'part' COMIENZA con alguno de los términos
+            if (constructibilidadTerms.some(term => part.startsWith(term))) {
+                result.constructibilidad.push(part);
+            } else if (ocupacionTerms.some(term => part.startsWith(term))) {
+                result.ocupacion.push(part);
+            }
+        });
+
+        // Devolver los resultados unidos por un salto de línea HTML, o '--' si están vacíos
+        // Usar <br> para los saltos de línea en el HTML
+        return {
+            constructibilidad: result.constructibilidad.length > 0 ? result.constructibilidad.join('<br>') : '--',
+            ocupacion: result.ocupacion.length > 0 ? result.ocupacion.join('<br>') : '--'
+        };
+    };
+
+    /**
+     * Usa Turf.js para encontrar el PREDIO en el que se hizo clic
+     */
+    const findPredioFeature = (latlng) => {
+        if (!predialFeatureCollection || !latlng) return null;
+        
+        const point = turf.point([latlng.lng, latlng.lat]);
+        
+        // 1. Búsqueda Rápida: Punto dentro del polígono
+        try {
+            for (const feature of predialFeatureCollection.features) {
+                if (turf.booleanPointInPolygon(point, feature.geometry)) {
+                    return feature; // Encontrado
+                }
+            }
+        } catch (e) {
+            console.error("Error en Turf (pointInPolygon): ", e);
+        }
+
+        // 2. Búsqueda Lenta (Fallback): Punto más cercano
+        // Si el clic de Nominatim cae en la calle, buscar el predio más cercano
+        console.log("Punto no encontrado en polígono, buscando predio más cercano...");
+        try {
+            let closestFeature = null;
+            let minDistance = Infinity;
+
+            turf.featureEach(predialFeatureCollection, (feature) => {
+                let distance = Infinity;
+                
+                try {
+                    // Esta función es más lenta pero precisa para polígonos
+                    distance = turf.pointToLineDistance(point, turf.polygonToLine(feature.geometry), { units: 'meters' });
+                } catch (e) {
+                    // Fallback si polygonToLine falla (ej. geometría inválida)
+                    // console.warn("Error en turf.pointToLineDistance, usando centroide");
+                    const center = turf.centerOfMass(feature);
+                    distance = turf.distance(point, center, { units: 'meters' });
+                }
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestFeature = feature;
+                }
+            });
+
+            // Aceptar solo si está a 30 metros (para evitar clics muy lejanos)
+            if (minDistance < 30) {
+                console.log(`Predio más cercano encontrado a ${minDistance.toFixed(1)} metros.`);
+                return closestFeature;
+            }
+        } catch (e) {
+             console.error("Error en análisis de cercanía de Turf.js:", e);
+        }
+        
+        return null; // No encontrado
+    };
+    
+    /**
+     * Función central que se llama al hacer clic en el mapa, en un predio, o al buscar.
+     */
+    const analyzeLocation = (latlng) => {
+        // 1. Asegurarse que todos los datos de análisis estén cargados
+        if (!predialFeatureCollection || !prcFeatureCollection || !construccionFeatureCollection || !usosFeatureCollection || !poblacionFeatureCollection || !localesFeatureCollection) {
+            console.warn("Los datos de análisis aún no están cargados. Active la capa 'Subdivisión Predial' primero.");
+            // Si el clic fue manual (no en un predio), solo mostrar info del pin
+            showPinInfo(latlng);
+            return;
+        }
+        
+        // 2. Encontrar el predio en el punto de clic
+        const predioFeature = findPredioFeature(latlng);
+        
+        // 3. Si no se hizo clic en un predio (clic en la calle)
+        if (!predioFeature) {
+            showPinInfo(latlng);
+            return;
+        }
+        
+        // 4. ¡Se encontró un predio! Realizar todos los análisis
+        console.log("Predio encontrado:", predioFeature.properties.ROL);
+        showFeatureDetails(predioFeature.properties, "Detalle del Predio");
+
+        const bounds = L.geoJSON(predioFeature.geometry).getBounds();
+        const center = bounds.getCenter();
+        
+        // 5. Guardar datos del predio
+        selectedParcelData = {};
+        selectedParcelData.properties = predioFeature.properties;
+        selectedParcelData.geometry = predioFeature.geometry;
+        selectedParcelData.bounds = bounds;
+        selectedParcelData.rol = predioFeature.properties.ROL || '--';
+        const area = predioFeature.properties.M2 || predioFeature.properties.SUPERFICIE;
+        selectedParcelData.area = truncateNumericValue(area) || '--';
+        selectedParcelData.address = 'Buscando ubicación...'; // Placeholder
+
+        // 6. Encontrar Zona y Datos de Construcción usando Turf.js
+        const prcProps = findPrcProperties(center);
+        const construccionProps = findConstruccionProperties(center);
+        const usosProps = findUsosProperties(center);
+        const primaryPoblacionFeature = findPoblacionFeature(center);
+        const neighborPoblacionProps = findSurroundingPoblacion(primaryPoblacionFeature, poblacionFeatureCollection);
+
+        selectedParcelData.zone = prcProps ? prcProps.zona : '--';
+        selectedParcelData.usosProperties = usosProps;
+        selectedParcelData.poblacionProps = primaryPoblacionFeature ? primaryPoblacionFeature.properties : null;
+        selectedParcelData.poblacionVecinosProps = sumPoblacionProperties(neighborPoblacionProps);
+        selectedParcelData.competitors = findCompetitors(center, localesFeatureCollection);
+        
+        // 7. Extraer y parsear datos de Construcción
+        if (construccionProps) {
+            selectedParcelData.alturaMaxima = construccionProps['ENVOLVENTE VOLUMÉTRICA'] || '--';
+            const superficieString = construccionProps['SUPERFICIE EDIFICABLE'] || '';
+            const coeficientes = parseSuperficieEdificable(superficieString);
+            selectedParcelData.constructibilidad = coeficientes.constructibilidad;
+            selectedParcelData.ocupacion = coeficientes.ocupacion;
+            selectedParcelData.notaAdicional = construccionProps['NOTA ADICIONAL'] || '--';
+        } else {
+            selectedParcelData.alturaMaxima = '--';
+            selectedParcelData.constructibilidad = '--';
+            selectedParcelData.ocupacion = '--';
+            selectedParcelData.notaAdicional = '--';
+        }
+        
+        // 8. Habilitar herramientas de análisis en sidebar
+        document.getElementById('analysis-tool-content').classList.remove('hidden');
+        
+        // Poblar dropdown de sidebar
+        const comercioSelectSidebar = document.getElementById('comercio-select-sidebar');
+        comercioSelectSidebar.innerHTML = '<option value="">-- Elija una categoría --</option>'; // Reset
+        TIPO_COMERCIO_LISTA.forEach(tipo => {
+            const option = document.createElement('option');
+            option.value = tipo;
+            option.textContent = tipo;
+            comercioSelectSidebar.appendChild(option);
+        });
+        document.getElementById('analysis-results-sidebar').classList.add('hidden'); // Ocultar permisos hasta seleccionar
+
+        // 9. Buscar dirección (asincrónico)
+        const lat = center.lat.toFixed(6);
+        const lng = center.lng.toFixed(6);
+        const reverseGeocodingUrl = `${NOMINATIM_URL}reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+
+        fetch(reverseGeocodingUrl)
+            .then(response => response.json())
+            .then(data => {
+                const address = formatNominatimAddress(data.address);
+                selectedParcelData.address = address !== 'Dirección no encontrada' ? address : (predioFeature.properties.DIRECCION || 'Ubicación no encontrada');
+            
+                document.getElementById('analysis-address').textContent = selectedParcelData.address;
+            })
+            .catch(error => {
+                console.error('Error en geocodificación de centroide:', error);
+                selectedParcelData.address = predioFeature.properties.DIRECCION || 'Error al buscar ubicación';
+                document.getElementById('analysis-address').textContent = selectedParcelData.address;
+            })
+            .finally(() => {
+                // --- CORRECCIÓN: Habilitar el botón DESPUÉS de que la dirección se haya buscado
+                document.getElementById('generate-report-btn').disabled = false;
+            });
+            
+        // 10. Colocar el marcador en el punto exacto del clic
+        if (currentMarker) {
+            map.removeLayer(currentMarker);
+        }
+        currentMarker = L.marker(latlng).addTo(map)
+            .bindPopup(`<b>Predio ROL:</b> ${selectedParcelData.rol}<br><b>Zona:</b> ${selectedParcelData.zone}`)
+            .openPopup();
+    };
+
+    /**
+     * Muestra solo la info del pin (cuando no se hace clic en un predio)
+     */
+    const showPinInfo = (latlng) => {
+        if (currentMarker) {
+            map.removeLayer(currentMarker);
+        }
+        currentMarker = L.marker(latlng).addTo(map)
+            .bindPopup(`Coordenadas: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`)
+            .openPopup();
+        
+        document.getElementById('feature-details').classList.add('hidden');
+        document.getElementById('pin-details').classList.remove('hidden');
+        document.getElementById('no-property-selected').classList.add('hidden');
+        document.getElementById('generate-report-btn').disabled = true; // CORRECCIÓN: Deshabilitar el botón
+        document.getElementById('analysis-tool-content').classList.add('hidden'); // Ocultar dropdown
+        selectedParcelData = null; 
+
+        document.getElementById('pin-lat').textContent = latlng.lat.toFixed(6);
+        document.getElementById('pin-lng').textContent = latlng.lng.toFixed(6);
+        document.getElementById('pin-address').textContent = 'Buscando dirección...';
+
+        const reverseGeocodingUrl = `${NOMINATIM_URL}reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=18&addressdetails=1`;
+        fetch(reverseGeocodingUrl)
+            .then(response => response.json())
+            .then(data => {
+                const address = formatNominatimAddress(data.address);
+                document.getElementById('pin-address').textContent = address;
+                currentMarker.setPopupContent(`<b>${address}</b><br>Lat: ${latlng.lat.toFixed(6)}, Lng: ${latlng.lng.toFixed(6)}`);
+            })
+            .catch(error => {
+                console.error('Error en geocodificación inversa:', error);
+                document.getElementById('pin-address').textContent = 'Error al buscar dirección';
+            });
+    };
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+
+        // --- LANDING PAGE TRANSITION ---
+        const landingPage = document.getElementById('landing-page');
+        const appContainer = document.getElementById('app-container');
+        const goToMapBtn = document.getElementById('go-to-map-btn');
+
+        goToMapBtn.addEventListener('click', () => {
+            landingPage.style.transition = 'opacity 0.5s ease-out';
+            landingPage.style.opacity = '0';
+            
+            setTimeout(() => {
+                landingPage.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    initializeMap();
+                    if (map) { 
+                        map.invalidateSize(); 
+                    }
+                }, 300); 
+                
+            }, 500); 
+        });
+
+
+        // --- MAP INITIALIZATION FUNCTION ---
+        const initializeMap = () => {
+            if (map) {
+                map.remove();
+            }
+
+            map = L.map('map', {
+                zoomControl: false 
+            }).setView([INITIAL_LAT, INITIAL_LNG], INITIAL_ZOOM);
+
+            changeBasemap('osm'); 
+
+            // El clic en el mapa ahora llama a la función de análisis central
+            map.on('click', (e) => analyzeLocation(e.latlng));
+
+            document.getElementById('zoom-in').addEventListener('click', () => map.zoomIn());
+            document.getElementById('zoom-out').addEventListener('click', () => map.zoomOut());
+            
+            document.querySelectorAll('.basemap-toggle').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    changeBasemap(e.target.value);
+                });
+            });
+
+            // --- Listeners de Capas GeoJSON ---
+            
+            // Listener para la capa visual del PRC
+            const prcToggle = document.getElementById('toggle-prc-layer');
+            prcToggle.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    loadPrcData((dataCollection) => {
+                        if (!prcLayer) { 
+                            const prcStyle = { "color": "#FBBF24", "weight": 1.5, "opacity": 0.8, "fillColor": "#FDE68A", "fillOpacity": 0.4 };
+                            prcLayer = L.geoJson(dataCollection, {
+                                style: prcStyle,
+                                onEachFeature: (feature, layer) => {
+                                    const popupContent = createPopupContent("PRC Providencia", feature.properties);
+                                    layer.bindPopup(popupContent);
+                                    layer.on('click', (ev) => {
+                                        L.DomEvent.stop(ev); 
+                                        showFeatureDetails(feature.properties, "PRC Providencia");
+                                        document.getElementById('generate-report-btn').disabled = true;
+                                    });
+                                }
+                            });
+                        }
+                        if (!map.hasLayer(prcLayer)) {
+                            prcLayer.addTo(map);
+                        }
+                    });
+                } else {
+                    if (prcLayer && map.hasLayer(prcLayer)) {
+                        map.removeLayer(prcLayer);
+                    }
+                }
+            });
+
+            // 1. Capa de Población
+            const poblacionToggle = document.getElementById('toggle-poblacion-layer');
+            poblacionToggle.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    loadPoblacionData((dataCollection) => { // Cargar datos en memoria
+                        if (!poblacionLayer) {
+                            const poblacionStyle = { "color": "#006d2c", "weight": 1, "opacity": 0.8, "fillColor": "#31a354", "fillOpacity": 0.5 };
+                            poblacionLayer = L.geoJson(dataCollection, {
+                                style: poblacionStyle,
+                                onEachFeature: (feature, layer) => {
+                                    const popupContent = createPopupContent("Datos de Población", feature.properties);
+                                    layer.bindPopup(popupContent);
+                                    layer.on('click', (ev) => {
+                                        L.DomEvent.stop(ev);
+                                        showFeatureDetails(feature.properties, "Datos de Población");
+                                        document.getElementById('generate-report-btn').disabled = true;
+                                    });
+                                }
+                            });
+                        }
+                        if (!map.hasLayer(poblacionLayer)) {
+                            poblacionLayer.addTo(map);
+                        }
+                    });
+                } else {
+                    if (poblacionLayer && map.hasLayer(poblacionLayer)) {
+                        map.removeLayer(poblacionLayer);
+                    }
+                }
+            });
+
+            // 2. Capa de Construcción (Visual)
+            const construccionToggle = document.getElementById('toggle-construccion-layer');
+            construccionToggle.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    loadConstruccionData((dataCollection) => {
+                        if (!construccionLayer) { 
+                            const layerStyle = { "color": "#2b8cbe", "weight": 1, "opacity": 0.8, "fillColor": "#a6bddb", "fillOpacity": 0.5 };
+                            construccionLayer = L.geoJson(dataCollection, {
+                                style: layerStyle,
+                                onEachFeature: (feature, layer) => {
+                                    const popupContent = createPopupContent("Usos de Suelo (Construcción)", feature.properties);
+                                    layer.bindPopup(popupContent);
+                                    layer.on('click', (ev) => {
+                                        L.DomEvent.stop(ev);
+                                        showFeatureDetails(feature.properties, "Usos de Suelo (Construcción)");
+                                        document.getElementById('generate-report-btn').disabled = true;
+                                    });
+                                }
+                            });
+                        }
+                        if (!map.hasLayer(construccionLayer)) {
+                            construccionLayer.addTo(map);
+                        }
+                    });
+                } else {
+                    if (construccionLayer && map.hasLayer(construccionLayer)) {
+                        map.removeLayer(construccionLayer);
+                    }
+                }
+            });
+
+            // 3. Capa de Usos Autorizados
+            const usosToggle = document.getElementById('toggle-usos-layer');
+            usosToggle.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    loadUsosData((dataCollection) => { // Cargar datos en memoria
+                        if (!usosLayer) {
+                            const layerStyle = { "color": "#7a0177", "weight": 1, "opacity": 0.8, "fillColor": "#ae017e", "fillOpacity": 0.5 };
+                            usosLayer = L.geoJson(dataCollection, {
+                                style: layerStyle,
+                                onEachFeature: (feature, layer) => {
+                                    const popupContent = createPopupContent("Usos de Suelo (Autorizados)", feature.properties);
+                                    layer.bindPopup(popupContent);
+                                    layer.on('click', (ev) => {
+                                        L.DomEvent.stop(ev);
+                                        showFeatureDetails(feature.properties, "Usos de Suelo (Autorizados)");
+                                        document.getElementById('generate-report-btn').disabled = true;
+                                    });
+                                }
+                            });
+                        }
+                        if (!map.hasLayer(usosLayer)) {
+                            usosLayer.addTo(map);
+                        }
+                    });
+                } else {
+                    if (usosLayer && map.hasLayer(usosLayer)) {
+                        map.removeLayer(usosLayer);
+                    }
+                }
+            });
+
+            // 4. Capa de Subdivisión Predial
+            const predialToggle = document.getElementById('toggle-predial-layer');
+            predialToggle.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    // Cargar TODOS los archivos de datos necesarios para el análisis
+                    loadPrcData(() => {
+                        console.log("Datos de Zonificación (PRC) cargados en memoria.");
+                        loadConstruccionData(() => {
+                            console.log("Datos de Construcción (Altura/Coeficientes) cargados.");
+                            loadUsosData(() => {
+                                console.log("Datos de Usos (Permisos) cargados.");
+                                loadPoblacionData(() => {
+                                    console.log("Datos de Población (Teselas) cargados.");
+                                    loadLocalesComercialesData(() => {
+                                        console.log("Datos de Locales Comerciales cargados.");
+                                        loadPredialData(() => { // Cargar los predios al final
+                                            console.log("Datos de Predios cargados en memoria.");
+                                            if (!predialLayer) {
+                                                const layerStyle = { "color": "#333333", "weight": 0.5, "opacity": 0.7, "fillOpacity": 0.0 };
+                                                predialLayer = L.geoJson(predialFeatureCollection, { // Usar datos de memoria
+                                                    style: layerStyle,
+                                                    onEachFeature: (feature, layer) => {
+                                                        const popupContent = createPopupContent("Detalle del Predio", feature.properties);
+                                                        layer.bindPopup(popupContent);
+                                                        
+                                                        // El clic ahora llama a la función central
+                                                        layer.on('click', (ev) => {
+                                                            L.DomEvent.stop(ev);
+                                                            analyzeLocation(ev.latlng);
+                                                        });
+                                                    }
+                                                });
+                                            }
+                                            if (!map.hasLayer(predialLayer)) {
+                                                predialLayer.addTo(map);
+                                            }
+                                        }); // Fin loadPredialData
+                                    }); // Fin loadLocalesComercialesData
+                                }); // Fin loadPoblacionData
+                            }); // Fin loadUsosData
+                        }); // Fin loadConstruccionData
+                    }); // Fin loadPrcData
+                } else {
+                    if (predialLayer && map.hasLayer(predialLayer)) {
+                        map.removeLayer(predialLayer);
+                    }
+                }
+            });
+
+
+            // 5. Capa de Locales Comerciales
+            const localesToggle = document.getElementById('toggle-locales-layer');
+            localesToggle.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    // Usar la función de carga que guarda en memoria
+                    loadLocalesComercialesData((dataCollection) => {
+                        if (!localesLayer) {
+                            const layerStyle = { radius: 3, fillColor: "#ff0000", color: "#800000", weight: 1, opacity: 1, fillOpacity: 0.8 };
+                            localesLayer = L.geoJson(dataCollection, {
+                                pointToLayer: (feature, latlng) => {
+                                    return L.circleMarker(latlng, layerStyle);
+                                },
+                                onEachFeature: (feature, layer) => {
+                                    const popupContent = createPopupContent("Local Comercial", feature.properties);
+                                    layer.bindPopup(popupContent);
+                                    layer.on('click', (ev) => {
+                                        L.DomEvent.stop(ev);
+                                        showFeatureDetails(feature.properties, "Local Comercial");
+                                        document.getElementById('generate-report-btn').disabled = true;
+                                    });
+                                }
+                            });
+                        }
+                        if (!map.hasLayer(localesLayer)) {
+                            localesLayer.addTo(map);
+                        }
+                    });
+                } else {
+                    if (localesLayer && map.hasLayer(localesLayer)) {
+                        map.removeLayer(localesLayer);
+                    }
+                }
+            });
+            // --- FIN DE LISTENERS DE CAPAS ---
+        };
+
+        // --- FUNCIÓN PARA CAMBIAR EL MAPA BASE ---
+        const changeBasemap = (key) => {
+            const newBasemap = BASEMAPS[key];
+            if (!newBasemap) return;
+            if (currentBasemapLayer && map.hasLayer(currentBasemapLayer)) {
+                map.removeLayer(currentBasemapLayer);
+            }
+            if (!newBasemap.layer) {
+                newBasemap.layer = L.tileLayer(newBasemap.url, {
+                    maxZoom: 19,
+                    attribution: newBasemap.attribution
+                });
+            }
+            newBasemap.layer.addTo(map);
+            currentBasemapLayer = newBasemap.layer;
+            if (currentMarker) {
+                currentMarker.bringToFront(); 
+            }
+        };
+
+        // --- HANDLER PARA CLIC EN EL MAPA ---
+        const onMapClick = (e) => {
+            // Cargar datos de predios si es necesario (para análisis de pin)
+            // Solo si la capa de predios ha sido activada al menos una vez
+            if (predialFeatureCollection) {
+                analyzeLocation(e.latlng);
+            } else {
+                // Fallback a solo mostrar pin si las capas de análisis no están listas
+                showPinInfo(e.latlng);
+            }
+        };
+
+        // --- HANDLER PARA BÚSQUEDA DE DIRECCIONES (Nominatim) ---
+        const searchInput = document.getElementById('address-search');
+        const searchButton = document.getElementById('search-button');
+        const searchResultsDiv = document.getElementById('search-results');
+        
+        const searchInputAnalysis = document.getElementById('address-search-analysis');
+        const searchButtonAnalysis = document.getElementById('search-button-analysis');
+        const searchResultsAnalysisDiv = document.getElementById('search-results-analysis');
+
+        const performSearch = (inputId, resultsId) => {
+            const inputEl = document.getElementById(inputId);
+            const resultsEl = document.getElementById(resultsId);
+            
+            const query = inputEl.value.trim();
+            if (query.length < 3) return; 
+
+            // Asegurarse de que los datos de análisis estén cargados
+            if (!predialFeatureCollection) {
+                 alert("Por favor, active la capa 'Subdivisión Predial' (en la pestaña Búsqueda) al menos una vez para habilitar esta función.");
+                 // Iniciar la carga de datos en segundo plano
+                 loadPrcData(() => loadConstruccionData(() => loadUsosData(() => loadPoblacionData(() => loadLocalesComercialesData(() => loadPredialData(null))))));
+                 return;
+            }
+
+            const fullQuery = query; 
+            const searchUrl = `${NOMINATIM_URL}search?q=${encodeURIComponent(fullQuery)}&format=json&limit=5&polygon_geojson=1&addressdetails=1`;
+
+            resultsEl.innerHTML = '';
+            resultsEl.classList.remove('hidden');
+            resultsEl.innerHTML = '<div class="p-2 text-sm text-gray-500">Buscando...</div>';
+
+            fetch(searchUrl)
+                .then(response => response.json())
+                .then(data => {
+                    resultsEl.innerHTML = '';
+                    if (data && data.length > 0) {
+                        data.forEach(result => {
+                            const resultItem = document.createElement('div');
+                            resultItem.className = 'p-2 text-sm cursor-pointer hover:bg-gray-100 border-b last:border-b-0';
+                            
+                            resultItem.textContent = formatNominatimAddress(result.address);
+
+                            resultItem.onclick = () => {
+                                const lat = parseFloat(result.lat);
+                                const lng = parseFloat(result.lon);
+                                map.setView([lat, lng], 17); 
+                                
+                                // --- MODIFICACIÓN: Llamar a analyzeLocation ---
+                                analyzeLocation(L.latLng(lat, lng));
+                                // --- FIN MODIFICACIÓN ---
+                                
+                                resultsEl.classList.add('hidden');
+                                inputEl.value = ''; // Limpiar input
+                            };
+                            resultsEl.appendChild(resultItem);
+                        });
+                    } else {
+                        resultsEl.innerHTML = '<div class="p-2 text-sm text-gray-500">No se encontraron resultados para la búsqueda.</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error en búsqueda de Nominatim:', error);
+                    resultsEl.innerHTML = '<div class="p-2 text-sm text-red-500">Error al realizar la búsqueda.</div>';
+                });
+        };
+
+        // Listeners para la primera barra de búsqueda
+        searchButton.addEventListener('click', () => performSearch('address-search', 'search-results'));
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch('address-search', 'search-results');
+        });
+
+        // Listeners para la segunda barra de búsqueda
+        searchButtonAnalysis.addEventListener('click', () => performSearch('address-search-analysis', 'search-results-analysis'));
+        searchInputAnalysis.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') performSearch('address-search-analysis', 'search-results-analysis');
+        });
+
+
+        // --- SIDEBAR, TAB & MODAL INTERACTIVITY --- 
+
+        const sidebar = document.getElementById('sidebar');
+        const openSidebarBtn = document.getElementById('openSidebarBtn');
+        const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+
+        openSidebarBtn.addEventListener('click', () => sidebar.classList.remove('sidebar-hidden'));
+        closeSidebarBtn.addEventListener('click', () => sidebar.classList.add('sidebar-hidden'));
+
+        // --- TAB INTERACTIVITY ---
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const generateReportBtn = document.getElementById('generate-report-btn');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const tabName = button.dataset.tab;
+                
+                analysisMode = tabName; // 'search' o 'analysis'
+                if (analysisMode === 'search') {
+                    generateReportBtn.textContent = 'Generar Ficha Informativa (PDF)';
+                } else {
+                    generateReportBtn.textContent = 'Generar Análisis Comercial';
+                }
+
+                tabButtons.forEach(btn => {
+                    btn.classList.remove('border-blue-500', 'text-blue-600');
+                    btn.classList.add('border-transparent', 'text-gray-500');
+                });
+                button.classList.add('border-blue-500', 'text-blue-600');
+                button.classList.remove('border-transparent', 'text-gray-500');
+                
+                tabContents.forEach(content => {
+                    if (content.id === `${tabName}-tab-content`) {
+                        content.classList.remove('hidden');
+                    } else {
+                        content.classList.add('hidden');
+                    }
+                });
+            });
+        });
+
+        // --- MAP & PROPERTY INFO INTERACTIVITY ---
+        const noPropertySelected = document.getElementById('no-property-selected');
+        const pinDetails = document.getElementById('pin-details');
+        const featureDetails = document.getElementById('feature-details');
+        
+        // Inicializa el estado
+        pinDetails.classList.add('hidden'); 
+        featureDetails.classList.add('hidden');
+        noPropertySelected.classList.remove('hidden');
+        generateReportBtn.disabled = true;
+
+
+        // --- MODAL 1: FICHA NORMATIVA ---
+        const reportModal = document.getElementById('reportModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const printReportBtn = document.getElementById('print-report-btn'); 
+
+        const openNormativaModal = () => {
+            if (!selectedParcelData || !selectedParcelData.geometry || !selectedParcelData.bounds) return;
+
+            reportModal.classList.add('is-printing'); // Para la lógica de impresión
+            analysisModal.classList.remove('is-printing');
+
+            // Poblar el modal
+            document.getElementById('report-address').textContent = selectedParcelData.address || '--';
+            document.getElementById('report-rol').textContent = selectedParcelData.rol || '--';
+            document.getElementById('report-area').textContent = `${selectedParcelData.area || '--'} m²`; 
+            document.getElementById('report-zone').textContent = selectedParcelData.zone || '--';
+            
+            document.getElementById('report-ocupacion').innerHTML = selectedParcelData.ocupacion || '--';
+            document.getElementById('report-buildability').innerHTML = selectedParcelData.constructibilidad || '--';
+            
+            const alturaString = selectedParcelData.alturaMaxima || '--';
+            document.getElementById('report-altura').innerHTML = alturaString.replace(/;/g, '<br>');
+            
+            const notaString = selectedParcelData.notaAdicional || '--';
+            document.getElementById('report-nota').innerHTML = notaString.replace(/;/g, '<br>');
+            
+            // Mostrar el modal
+            reportModal.classList.remove('hidden');
+            setTimeout(() => {
+                reportModal.classList.remove('opacity-0');
+                document.getElementById('modal-content').classList.remove('scale-95');
+
+                // --- INICIALIZAR EL MINI-MAPA ---
+                if (reportMap) {
+                    reportMap.remove();
+                    reportMap = null;
+                }
+
+                reportMap = L.map('report-map-sketch', {
+                    zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, attributionControl: false
+                });
+
+                L.tileLayer(BASEMAPS['cartodb-light'].url, { maxZoom: 19 }).addTo(reportMap);
+
+                const sketchStyle = { 
+                    color: "#D97706", weight: 2, fillColor: "#F59E0B", fillOpacity: 0.7 
+                };
+                L.geoJSON(selectedParcelData.geometry, { style: sketchStyle }).addTo(reportMap);
+
+                reportMap.fitBounds(selectedParcelData.bounds.pad(0.1));
+
+                setTimeout(() => { if (reportMap) { reportMap.invalidateSize(); } }, 100); 
+
+            }, 10); 
+        };
+        
+        const closeNormativaModal = () => {
+            reportModal.classList.add('opacity-0');
+            document.getElementById('modal-content').classList.add('scale-95');
+            reportModal.classList.remove('is-printing');
+            
+            if (reportMap) {
+                reportMap.remove();
+                reportMap = null;
+            }
+
+            setTimeout(() => {
+                reportModal.classList.add('hidden');
+            }, 300);
+        };
+
+        closeModalBtn.addEventListener('click', closeNormativaModal);
+        reportModal.addEventListener('click', (e) => {
+            if (e.target === reportModal) closeNormativaModal();
+        });
+
+        printReportBtn.addEventListener('click', () => {
+            if (reportMap) {
+                reportMap.invalidateSize();
+            }
+            setTimeout(() => {
+                window.print();
+            }, 250); 
+        });
+
+
+        // --- MODAL 2: ANÁLISIS COMERCIAL ---
+        
+        const analysisModal = document.getElementById('analysisModal');
+        const closeAnalysisModalBtn = document.getElementById('closeAnalysisModalBtn');
+        const printAnalysisBtn = document.getElementById('print-analysis-btn');
+        const comercioSelectSidebar = document.getElementById('comercio-select-sidebar');
+        const comercioSelectModal = document.getElementById('comercio-select-modal');
+
+        const openAnalysisModal = () => {
+            if (!selectedParcelData) return;
+
+            analysisModal.classList.add('is-printing'); // Para la lógica de impresión
+            reportModal.classList.remove('is-printing');
+
+            // 1. Poblar Dropdown (ambos, sidebar y modal)
+            [comercioSelectSidebar, comercioSelectModal].forEach(select => {
+                select.innerHTML = '<option value="">-- Elija una categoría --</option>'; // Reset
+                TIPO_COMERCIO_LISTA.forEach(tipo => {
+                    const option = document.createElement('option');
+                    option.value = tipo;
+                    option.textContent = tipo;
+                    select.appendChild(option);
+                });
+                select.value = comercioSelectSidebar.value; // Sincronizar
+            });
+            
+            // Resetear campos
+            document.getElementById('analysis-permisos').classList.add('hidden');
+            document.getElementById('analysis-competencia-section').classList.add('hidden');
+            document.getElementById('analysis-results-sidebar').classList.add('hidden');
+
+            // 2. Poblar dirección
+            document.getElementById('analysis-address').textContent = selectedParcelData.address || '--';
+            
+            // 3. Poblar tablas de población
+            document.getElementById('local-population-table').innerHTML = createPoblacionTable(selectedParcelData.poblacionProps);
+            document.getElementById('surrounding-population-table').innerHTML = createPoblacionTable(selectedParcelData.poblacionVecinosProps);
+
+            // 4. Mostrar modal
+            analysisModal.classList.remove('hidden');
+            setTimeout(() => {
+                analysisModal.classList.remove('opacity-0');
+                document.getElementById('analysis-modal-content').classList.remove('scale-95');
+
+                // 5. Inicializar mapa croquis
+                if (analysisMap) analysisMap.remove();
+                analysisMap = L.map('report-map-sketch-comercial', {
+                    zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, attributionControl: false
+                });
+
+                L.tileLayer(BASEMAPS['cartodb-light'].url, { maxZoom: 19 }).addTo(analysisMap);
+                const sketchStyle = { color: "#D97706", weight: 2, fillColor: "#F59E0B", fillOpacity: 0.7 };
+                L.geoJSON(selectedParcelData.geometry, { style: sketchStyle }).addTo(analysisMap);
+                analysisMap.fitBounds(selectedParcelData.bounds.pad(0.1));
+                
+                // 6. Inicializar mapa de competencia (vacío)
+                if (competitorMap) competitorMap.remove();
+                competitorMap = L.map('competitor-map-sketch', {
+                    zoomControl: false, attributionControl: false
+                }).setView(selectedParcelData.bounds.getCenter(), 15); // Zoom más alejado
+                L.tileLayer(BASEMAPS['cartodb-light'].url, { maxZoom: 19 }).addTo(competitorMap);
+
+                // Dibujar el radio de 400m
+                L.circle(selectedParcelData.bounds.getCenter(), {
+                    radius: 400, color: '#007bff', fillOpacity: 0.1, weight: 2, dashArray: '5, 5'
+                }).addTo(competitorMap);
+                
+                // Añadir el predio del usuario como referencia
+                L.geoJSON(selectedParcelData.geometry, { style: sketchStyle }).addTo(competitorMap);
+
+                // 7. Invalidar mapas y disparar actualización de UI
+                // --- MODIFICACIÓN: Aumentado a 1 segundo (1000ms) ---
+                setTimeout(() => {
+                    analysisMap.invalidateSize();
+                    competitorMap.invalidateSize();
+                    
+                    // Disparar el evento 'change' DESPUÉS de que el mapa se haya inicializado
+                    if(comercioSelectSidebar.value) {
+                        comercioSelectModal.dispatchEvent(new Event('change'));
+                    }
+                    
+                }, 1000); // 1 segundo de retraso
+
+            }, 10);
+        };
+        
+        // --- Lógica del Dropdown de Análisis Comercial (en MODAL) ---
+        comercioSelectModal.addEventListener('change', (e) => {
+            const selectedComercio = e.target.value;
+            // Sincronizar con el dropdown del sidebar
+            comercioSelectSidebar.value = selectedComercio;
+            document.getElementById('comercio-print-selection').textContent = selectedComercio; // Para impresión
+            
+            // Disparar la lógica de análisis
+            updateAnalysisUI(selectedComercio);
+        });
+        
+        // --- Lógica del Dropdown de Análisis Comercial (en SIDEBAR) ---
+        comercioSelectSidebar.addEventListener('change', (e) => {
+            const selectedComercio = e.target.value;
+            // Sincronizar con el dropdown del modal
+            comercioSelectModal.value = selectedComercio;
+            document.getElementById('comercio-print-selection').textContent = selectedComercio; // Para impresión
+            
+            // Disparar la lógica de análisis
+            updateAnalysisUI(selectedComercio);
+        });
+        
+        // --- Función Central de Actualización de Análisis ---
+        const updateAnalysisUI = (selectedComercio) => {
+            if (!selectedComercio || !selectedParcelData) {
+                document.getElementById('analysis-permisos').classList.add('hidden');
+                document.getElementById('analysis-competencia-section').classList.add('hidden');
+                document.getElementById('analysis-results-sidebar').classList.add('hidden');
+                return;
+            }
+
+            // 1. Mostrar Permisos (en ambos, sidebar y modal)
+            const categoria = COMERCIO_TO_CATEGORIA[selectedComercio];
+            const usoKey = CATEGORIA_TO_USO_KEY[categoria];
+            
+            if (usoKey && selectedParcelData.usosProperties) {
+                const permitido = selectedParcelData.usosProperties[`${usoKey} - Permitido`] || 'No especificado';
+                const prohibido = selectedParcelData.usosProperties[`${usoKey} - Prohibido`] || 'No especificado';
+                
+                document.getElementById('analysis-permiso-permitido').textContent = permitido;
+                document.getElementById('permiso-permitido-sidebar').textContent = permitido;
+                document.getElementById('analysis-permiso-prohibido').textContent = prohibido;
+                document.getElementById('permiso-prohibido-sidebar').textContent = prohibido;
+
+                document.getElementById('analysis-permisos').classList.remove('hidden');
+                document.getElementById('analysis-results-sidebar').classList.remove('hidden');
+            } else {
+                // Manejar "No Clasificado"
+                document.getElementById('analysis-permiso-permitido').textContent = 'Categoría no clasificable';
+                document.getElementById('permiso-permitido-sidebar').textContent = 'Categoría no clasificable';
+                document.getElementById('analysis-permiso-prohibido').textContent = 'Categoría no clasificable';
+                document.getElementById('permiso-prohibido-sidebar').textContent = 'Categoría no clasificable';
+                
+                document.getElementById('analysis-permisos').classList.remove('hidden');
+                document.getElementById('analysis-results-sidebar').classList.remove('hidden');
+            }
+
+            // 2. Filtrar Competidores
+            const competidoresFiltrados = selectedParcelData.competitors.filter(
+                feature => feature.properties.CATEGORIA === selectedComercio
+            );
+            
+            // 3. Actualizar Mapa de Competencia (solo si el modal está abierto)
+            if (competitorMap && !analysisModal.classList.contains('hidden')) {
+                // --- CORRECCIÓN: Invalidar tamaño ANTES de hacer zoom ---
+                competitorMap.invalidateSize();
+                
+                // Limpiar marcadores anteriores
+                if (competitorLayerGroup) {
+                    competitorMap.removeLayer(competitorLayerGroup);
+                }
+                
+                // Añadir nuevos marcadores
+                const competitorStyle = { radius: 5, fillColor: "#ff0000", color: "#800000", weight: 1, opacity: 1, fillOpacity: 0.8 };
+                competitorLayerGroup = L.geoJson(competidoresFiltrados, {
+                    pointToLayer: (feature, latlng) => L.circleMarker(latlng, competitorStyle),
+                    onEachFeature: (feature, layer) => {
+                        layer.bindPopup(createPopupContent(feature.properties.CATEGORIA, feature.properties));
+                    }
+                }).addTo(competitorMap);
+                
+                // --- CORRECCIÓN: Añadido setTimeout para el zoom ---
+                setTimeout(() => {
+                    // Ajustar zoom si hay competidores
+                    if (competidoresFiltrados.length > 0) {
+                        // Obtener bounds del predio y de los competidores y unirlos
+                        const allBounds = competitorLayerGroup.getBounds();
+                        allBounds.extend(selectedParcelData.bounds);
+                        competitorMap.fitBounds(allBounds.pad(0.2));
+                    } else {
+                        // Si no hay competidores, solo centrar en el predio
+                        competitorMap.fitBounds(selectedParcelData.bounds.pad(0.1));
+                    }
+                }, 100); // Un retraso de 100ms es suficiente aquí
+            }
+
+            // 4. Calcular Estadísticas
+            let totalWorkers = 0;
+            let totalIngresos = 0; // <-- AÑADIDO
+            let estatusCounts = { 'Superávit': 0, 'Neutro': 0, 'Déficit': 0, 'Sin Información': 0 };
+            let tamanoCounts = { "Gran empresa": 0, "Mediana empresa": 0, "Pequeña empresa": 0, "Micro empresa": 0, "No aplica": 0, "Sin Información": 0 }; // <-- AÑADIDO
+
+            competidoresFiltrados.forEach(feature => {
+                const workers = parseInt(feature.properties['NÚMERO_DE_TRABAJADORES_DEPENDIENTES']) || 0;
+                totalWorkers += workers;
+                
+                const ingresos = parseFloat(feature.properties['INGRESOS_UF']) || 0; // <-- AÑADIDO
+                totalIngresos += ingresos; // <-- AÑADIDO
+                
+                const estatus = feature.properties.ESTATUS || 'Sin Información';
+                if (estatus === null || estatus === '') {
+                    estatusCounts['Sin Información']++;
+                } else if (estatusCounts.hasOwnProperty(estatus)) {
+                    estatusCounts[estatus]++;
+                }
+
+                // --- INICIO CÁLCULO TAMAÑO ---
+                const tamano = feature.properties.TAMAÑO_EMPRESA || 'Sin Información';
+                if (tamano === null || tamano === '') {
+                    tamanoCounts['Sin Información']++;
+                } else if (tamanoCounts.hasOwnProperty(tamano)) {
+                    tamanoCounts[tamano]++;
+                }
+                // --- FIN CÁLCULO TAMAÑO ---
+            });
+
+            const numLocales = competidoresFiltrados.length;
+            const avgWorkers = numLocales > 0 ? Math.round(totalWorkers / numLocales) : 0; // <-- CORREGIDO a Math.round
+            const avgIngresos = numLocales > 0 ? (totalIngresos / numLocales).toFixed(1) : 0;
+            
+            document.getElementById('analysis-total-locales').textContent = numLocales;
+            document.getElementById('analysis-total-workers').textContent = totalWorkers;
+            document.getElementById('analysis-avg-workers').textContent = avgWorkers;
+            
+            document.getElementById('analysis-total-ingresos').textContent = totalIngresos.toFixed(1);
+            document.getElementById('analysis-avg-ingresos').textContent = avgIngresos;
+            
+            // --- MODIFICACIÓN: Registrar el plugin de Chart.js globalmente ---
+            // Asegurarse de que el plugin está registrado ANTES de crear un gráfico
+            try {
+                if (Chart.plugins.getAll().filter(p => p.id === 'datalabels').length === 0) {
+                    Chart.register(ChartDataLabels);
+                }
+            } catch (e) {
+                console.error("Error registrando ChartDataLabels:", e);
+            }
+            // --- FIN MODIFICACIÓN ---
+
+            // 5. Renderizar Gráfico (Estatus)
+            const chartCtx = document.getElementById('estatus-chart').getContext('2d');
+            if (chartInstance) {
+                chartInstance.destroy(); // Destruir gráfico anterior
+            }
+            chartInstance = new Chart(chartCtx, {
+                type: 'doughnut',
+                plugins: [ChartDataLabels], // <-- AÑADIDO PLUGIN
+                data: {
+                    labels: ['Superávit', 'Neutro', 'Déficit', 'Sin Info'],
+                    datasets: [{
+                        label: 'Estatus de Locales',
+                        data: [estatusCounts['Superávit'], estatusCounts['Neutro'], estatusCounts['Déficit'], estatusCounts['Sin Información']],
+                        backgroundColor: [
+                            'rgb(74, 222, 128)', // Verde claro
+                            'rgb(156, 163, 175)', // Gris
+                            'rgb(239, 68, 68)',    // Rojo
+                            'rgb(209, 213, 219)'  // Gris claro
+                        ],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        // Configuración del plugin de datalabels
+                        datalabels: {
+                            formatter: (value, ctx) => {
+                                let sum = 0;
+                                let dataArr = ctx.chart.data.datasets[0].data;
+                                dataArr.map(data => { sum += data; });
+                                if (sum === 0) return '0%';
+                                let percentage = (value*100 / sum).toFixed(0) + '%';
+                                return percentage;
+                            },
+                            color: '#fff',
+                            textStrokeColor: '#000',
+                            textStrokeWidth: 1
+                        }
+                    }
+                }
+            });
+            
+            // 6. Renderizar Gráfico (Tamaño Empresa)
+            const tamanoCtx = document.getElementById('tamano-chart').getContext('2d');
+            if (tamanoChartInstance) {
+                tamanoChartInstance.destroy();
+            }
+            tamanoChartInstance = new Chart(tamanoCtx, {
+                type: 'doughnut',
+                plugins: [ChartDataLabels], // <-- AÑADIDO PLUGIN
+                data: {
+                    labels: ['Gran', 'Mediana', 'Pequeña', 'Micro', 'No aplica', 'Sin Info'],
+                    datasets: [{
+                        label: 'Tamaño de Empresa',
+                        data: [
+                            tamanoCounts['Gran empresa'],
+                            tamanoCounts['Mediana empresa'],
+                            tamanoCounts['Pequeña empresa'],
+                            tamanoCounts['Micro empresa'],
+                            tamanoCounts['No aplica'],
+                            tamanoCounts['Sin Información']
+                        ],
+                        backgroundColor: [
+                            'rgb(59, 130, 246)',  // Azul
+                            'rgb(34, 197, 94)',  // Verde
+                            'rgb(234, 179, 8)',  // Amarillo
+                            'rgb(249, 115, 22)', // Naranja
+                            'rgb(107, 114, 128)',// Gris
+                            'rgb(209, 213, 219)' // Gris claro
+                        ],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        // Configuración del plugin de datalabels
+                        datalabels: {
+                            formatter: (value, ctx) => {
+                                let sum = 0;
+                                let dataArr = ctx.chart.data.datasets[0].data;
+                                dataArr.map(data => { sum += data; });
+                                if (sum === 0) return '0%';
+                                let percentage = (value*100 / sum).toFixed(0) + '%';
+                                return percentage;
+                            },
+                            color: '#fff',
+                            textStrokeColor: '#000',
+                            textStrokeWidth: 1
+                        }
+                    }
+                }
+            });
+
+
+            // Mostrar la sección de competencia
+            document.getElementById('analysis-competencia-section').classList.remove('hidden');
+        };
+
+
+        // --- Lógica de Cierre y Botón Principal ---
+        const closeAnalysisModal = () => {
+            analysisModal.classList.add('opacity-0');
+            document.getElementById('analysis-modal-content').classList.add('scale-95');
+            analysisModal.classList.remove('is-printing');
+            
+            if (analysisMap) { analysisMap.remove(); analysisMap = null; }
+            if (competitorMap) { competitorMap.remove(); competitorMap = null; }
+            if (competitorLayerGroup) { competitorLayerGroup = null; }
+            if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+            if (tamanoChartInstance) { tamanoChartInstance.destroy(); tamanoChartInstance = null; } // Limpieza
+            
+            setTimeout(() => {
+                analysisModal.classList.add('hidden');
+            }, 300);
+        };
+
+        closeAnalysisModalBtn.addEventListener('click', closeAnalysisModal);
+        analysisModal.addEventListener('click', (e) => {
+            if (e.target === analysisModal) closeAnalysisModal();
+        });
+
+        printAnalysisBtn.addEventListener('click', () => {
+            if (analysisMap) analysisMap.invalidateSize();
+            if (competitorMap) competitorMap.invalidateSize();
+            
+            setTimeout(() => {
+                window.print();
+            }, 250); 
+        });
+
+        // Evento del botón principal (que ahora tiene dos modos)
+        generateReportBtn.addEventListener('click', () => {
+            if (analysisMode === 'search') {
+                openNormativaModal();
+            } else {
+                openAnalysisModal();
+            }
+        });
+        
+    });
+</script>
+</body>
+</html>
